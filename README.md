@@ -236,5 +236,8 @@ source code.
 
 ## References
 
+- [Envoy External Processing API][envoy-ext-proc]
+- [Sablier][sablier]
+
 [envoy-ext-proc]: https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/ext_proc/v3/external_processor.proto
 [sablier]: https://sablierapp.dev/
