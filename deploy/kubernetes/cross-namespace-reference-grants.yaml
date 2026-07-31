@@ -1,0 +1,49 @@
+# Example 1: GatewayExtension "sablier-extproc" in namespace "gateway"
+# references the ext_proc Service in namespace "sablier-extproc".
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: allow-gatewayextension-to-extproc
+  namespace: sablier-extproc
+spec:
+  from:
+    - group: gateway.kgateway.dev
+      kind: GatewayExtension
+      namespace: gateway
+  to:
+    - group: ""
+      kind: Service
+      name: sablier-extproc
+---
+# Example 2: TrafficPolicy in namespace "apps" references a GatewayExtension
+# in namespace "gateway" through extProc.extensionRef.namespace.
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: allow-trafficpolicy-to-gatewayextension
+  namespace: gateway
+spec:
+  from:
+    - group: gateway.kgateway.dev
+      kind: TrafficPolicy
+      namespace: apps
+  to:
+    - group: gateway.kgateway.dev
+      kind: GatewayExtension
+      name: sablier-extproc
+---
+# Example 3: HTTPRoute in namespace "apps" forwards to a Service in
+# namespace "backends".
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: allow-httproute-to-backend
+  namespace: backends
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: apps
+  to:
+    - group: ""
+      kind: Service

@@ -1,0 +1,89 @@
+name: Publish container image
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - "v[0-9]*.[0-9]*.[0-9]*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: publish-image-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Log in to GitHub Container Registry
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" |
+            docker login "$REGISTRY" --username "${{ github.actor }}" --password-stdin
+
+      - name: Prepare image metadata
+        id: metadata
+        env:
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          image="$REGISTRY/${REPOSITORY,,}"
+          short_sha="${GITHUB_SHA::12}"
+          version="sha-$short_sha"
+          tags="$image:$version"
+
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            if [[ ! "$GITHUB_REF_NAME" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)(-([0-9A-Za-z][0-9A-Za-z.-]*))?$ ]]; then
+              echo "Tag must use the form vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH-PRERELEASE" >&2
+              exit 1
+            fi
+
+            major="${BASH_REMATCH[1]}"
+            minor="${BASH_REMATCH[2]}"
+            prerelease="${BASH_REMATCH[4]}"
+            version="${GITHUB_REF_NAME#v}"
+            tags="$image:$version"$'\n'"$image:sha-$short_sha"
+
+            if [[ -z "$prerelease" ]]; then
+              tags+=$'\n'"$image:$major.$minor"
+              tags+=$'\n'"$image:$major"
+              tags+=$'\n'"$image:latest"
+            fi
+          elif [[ "$GITHUB_REF_NAME" == "master" ]]; then
+            tags+=$'\n'"$image:edge"
+          fi
+
+          {
+            echo "version=$version"
+            echo "tags<<EOF"
+            echo "$tags"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and publish image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.metadata.outputs.tags }}
+          build-args: |
+            VERSION=${{ steps.metadata.outputs.version }}
+            REVISION=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: mode=max
+          sbom: true
