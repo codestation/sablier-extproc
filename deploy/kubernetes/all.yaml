@@ -71,7 +71,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: sablier-extproc
-          image: ghcr.io/sablierapp/sablier-extproc:0.1.0
+          image: ghcr.io/sablierapp/sablier-extproc:v0.1.0
           imagePullPolicy: IfNotPresent
           args:
             - -config=/etc/sablier-extproc/config.yaml

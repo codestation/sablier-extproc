@@ -2,11 +2,8 @@ name: Publish container image
 
 on:
   push:
-    branches:
-      - master
     tags:
       - "v[0-9]*.[0-9]*.[0-9]*"
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -42,28 +39,17 @@ jobs:
         run: |
           image="$REGISTRY/${REPOSITORY,,}"
           short_sha="${GITHUB_SHA::12}"
-          version="sha-$short_sha"
-          tags="$image:$version"
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)(-([0-9A-Za-z][0-9A-Za-z.-]*))?$ ]]; then
+            echo "Tag must use the form vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH-PRERELEASE" >&2
+            exit 1
+          fi
 
-          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
-            if [[ ! "$GITHUB_REF_NAME" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)(-([0-9A-Za-z][0-9A-Za-z.-]*))?$ ]]; then
-              echo "Tag must use the form vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH-PRERELEASE" >&2
-              exit 1
-            fi
+          prerelease="${BASH_REMATCH[4]}"
+          version="${GITHUB_REF_NAME#v}"
+          tags="$image:$GITHUB_REF_NAME"$'\n'"$image:sha-$short_sha"
 
-            major="${BASH_REMATCH[1]}"
-            minor="${BASH_REMATCH[2]}"
-            prerelease="${BASH_REMATCH[4]}"
-            version="${GITHUB_REF_NAME#v}"
-            tags="$image:$version"$'\n'"$image:sha-$short_sha"
-
-            if [[ -z "$prerelease" ]]; then
-              tags+=$'\n'"$image:$major.$minor"
-              tags+=$'\n'"$image:$major"
-              tags+=$'\n'"$image:latest"
-            fi
-          elif [[ "$GITHUB_REF_NAME" == "master" ]]; then
-            tags+=$'\n'"$image:edge"
+          if [[ -z "$prerelease" ]]; then
+            tags+=$'\n'"$image:latest"
           fi
 
           {
